@@ -6,7 +6,6 @@ import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
 import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 
-// Configure Monaco Environment Web Workers
 if (typeof window !== 'undefined' && !window.MonacoEnvironment) {
   window.MonacoEnvironment = {
     getWorker(_, label) {
@@ -19,8 +18,7 @@ if (typeof window !== 'undefined' && !window.MonacoEnvironment) {
   };
 }
 
-// Define simple Dark Cyber Theme
-monaco.editor.defineTheme('cyber-theme', {
+monaco.editor.defineTheme('editor-theme', {
   base: 'vs-dark',
   inherit: true,
   rules: [
@@ -31,7 +29,7 @@ monaco.editor.defineTheme('cyber-theme', {
     { token: 'function', foreground: '00e5ff', fontStyle: 'bold' }
   ],
   colors: {
-    'editor.background': '#0c0d18ee',
+    'editor.background': '#0c0d18',
     'editor.foreground': '#f8f8f2',
     'editorCursor.foreground': '#00ffcc',
     'editor.lineHighlightBackground': '#181b3088',
@@ -41,10 +39,12 @@ monaco.editor.defineTheme('cyber-theme', {
   }
 });
 
-export const MonacoEditor = ({ language = 'javascript', value = '', onChange, onRun }) => {
+export const MonacoEditor = ({ language = 'javascript', value = '', onChange, onRun, readOnly = false }) => {
   const containerRef = useRef(null);
   const editorRef = useRef(null);
   const isInternalChange = useRef(false);
+  const onRunRef = useRef(onRun);
+  onRunRef.current = onRun;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -52,11 +52,12 @@ export const MonacoEditor = ({ language = 'javascript', value = '', onChange, on
     const editor = monaco.editor.create(containerRef.current, {
       value,
       language,
-      theme: 'cyber-theme',
+      theme: 'editor-theme',
+      readOnly,
       automaticLayout: true,
-      fontSize: 14,
+      fontSize: 15,
       fontFamily: "'Fira Code', 'Share Tech Mono', Consolas, monospace",
-      minimap: { enabled: false },
+      minimap: { enabled: true },
       wordWrap: 'on',
       scrollBeyondLastLine: false,
       padding: { top: 12, bottom: 12 }
@@ -64,36 +65,39 @@ export const MonacoEditor = ({ language = 'javascript', value = '', onChange, on
 
     editorRef.current = editor;
 
-    // Listen to changes
     editor.onDidChangeModelContent(() => {
       if (isInternalChange.current) return;
       if (onChange) onChange(editor.getValue());
     });
 
-    // Shortcut: Ctrl+Enter to Run
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
-      if (onRun) onRun();
+      if (onRunRef.current) onRunRef.current();
     });
 
     return () => editor.dispose();
   }, []);
 
-  // Update value externally when language/template changes
   useEffect(() => {
-    if (editorRef.current && editorRef.current.getValue() !== value) {
-      isInternalChange.current = true;
-      editorRef.current.setValue(value);
-      isInternalChange.current = false;
-    }
+    if (!editorRef.current) return;
+    if (editorRef.current.getValue() === value) return;
+    isInternalChange.current = true;
+    editorRef.current.setValue(value ?? '');
+    // push cursor to top so the manual is readable
+    editorRef.current.setScrollTop(0);
+    editorRef.current.setPosition({ lineNumber: 1, column: 1 });
+    isInternalChange.current = false;
   }, [value]);
 
-  // Update language
   useEffect(() => {
     if (editorRef.current) {
       const model = editorRef.current.getModel();
       if (model) monaco.editor.setModelLanguage(model, language);
     }
   }, [language]);
+
+  useEffect(() => {
+    editorRef.current?.updateOptions({ readOnly });
+  }, [readOnly]);
 
   return <div ref={containerRef} className="monaco-container" />;
 };

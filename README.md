@@ -1,16 +1,26 @@
-# React + Vite
+# Code Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Minimal Monaco-based editor. Change language from the toolbar and write your own code.
 
-Currently, two official plugins are available:
+## Dual mode code checking
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Dual mode supports two-player rooms with live code sharing, synchronized challenges, and head-to-head scores. The second player can connect from another device using the room code, provided both devices can reach the WebSocket server.
 
-## React Compiler
+Run the app and the WebSocket server in separate terminals:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm run dual-server
+npm run dev -- --host 0.0.0.0
+```
 
-## Expanding the Oxlint configuration
+The WebSocket server listens on port 3001. Share the Vite URL and room code with the other player. For a remote opponent, allow inbound traffic to the Vite and WebSocket ports through the host firewall. To deploy the app, set `VITE_DUAL_SERVER_URL` to the reachable `ws://` or `wss://` URL ending in `/dual-ws`.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Deployment is not required for two players on the same Wi-Fi/LAN. Leave `VITE_DUAL_SERVER_URL` blank so the browser uses the hostname serving the site, then run `npm run dev -- --host 0.0.0.0` and `npm run dual-server`. The opponent opens `http://<host-computer-LAN-IP>:5173` and enters the room code. Allow inbound ports 5173 and 3001 through the host firewall. Players on different networks need a publicly reachable deployment or tunnel.
+
+Submissions in JavaScript, Python, Java, C++, and C# compile and run through a self-hosted Piston API. Start a Piston instance, copy `.env.example` to `.env`, and set `VITE_PISTON_URL` to its `/api/v2/execute` endpoint. For remote players, this must be a URL reachable from both players' browsers (not `localhost` on each device). Restart Vite after changing the environment file. The endpoint must allow browser requests from this app (CORS).
+
+The runner executes the challenge test cases and reports a score weighted 80% for correctness and 20% for a language-specific efficiency heuristic. The efficiency component is a hint, not a formal complexity proof. User code is sent to the configured Piston instance for compilation and execution.
+
+```bash
+npm run dev
+```

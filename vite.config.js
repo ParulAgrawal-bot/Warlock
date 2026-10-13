@@ -9,6 +9,9 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['monaco-editor']
+  },
+  ssr: {
+    external: ['ws']
   }
 })
 

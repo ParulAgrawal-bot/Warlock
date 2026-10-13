@@ -1,23 +1,22 @@
 {
-  "name": "package.json",
+  "name": "warlock",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dual-server": "node server/dualServer.js",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@chakra-ui/react": "^3.36.1",
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.1",
     "@monaco-editor/react": "^4.7.0",
-    "framer-motion": "^13.1.1",
+    "apify-client": "^2.20.0",
     "monaco-editor": "^0.53.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.17",
