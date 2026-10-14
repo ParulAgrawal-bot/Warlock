@@ -1,0 +1,15 @@
+services:
+  piston:
+    image: ghcr.io/engineer-man/piston:latest
+    container_name: warlock-piston
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "127.0.0.1:2000:2000"
+    volumes:
+      - piston_packages:/piston/packages
+    tmpfs:
+      - /tmp:exec
+
+volumes:
+  piston_packages:

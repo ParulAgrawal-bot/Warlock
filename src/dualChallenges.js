@@ -122,7 +122,7 @@ function createProgram(question, code, language) {
 }
 
 export async function runCasesWithPiston(question, code, language) {
-  const endpoint = (import.meta.env.VITE_PISTON_URL || 'http://localhost:2000/api/v2/execute').replace(/\/$/, '');
+  const endpoint = (import.meta.env.VITE_PISTON_URL || '/piston-api/execute').replace(/\/$/, '');
   let response;
   try {
     response = await fetch(endpoint, {
@@ -134,7 +134,7 @@ export async function runCasesWithPiston(question, code, language) {
       }),
     });
   } catch (error) {
-    const localRunnerMissing = /localhost:2000|127\.0\.0\.1:2000/.test(endpoint);
+    const localRunnerMissing = /localhost:2000|127\.0\.0\.1:2000|^\/piston-api\//.test(endpoint);
     return { error: localRunnerMissing
       ? `No code runner is listening at ${endpoint}. Start Piston with Docker, install its language runtimes, then retry. (${error.message})`
       : `Cannot reach the code runner at ${endpoint}. Check that Piston is running and allows requests from this app. (${error.message})` };

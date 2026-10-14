@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "dual-server": "node server/dualServer.js",
+    "piston:up": "docker compose up -d piston",
+    "piston:setup": "docker compose up -d piston && node scripts/setup-piston.mjs",
+    "piston:down": "docker compose down",
+    "piston:logs": "docker compose logs -f piston",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
