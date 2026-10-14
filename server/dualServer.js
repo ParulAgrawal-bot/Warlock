@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 
-const port = Number(process.env.DUAL_PORT || 3001);
+const port = Number(process.env.PORT || process.env.DUAL_PORT || 3001);
 const rooms = new Map();
 const validLanguages = new Set(['javascript', 'python', 'java', 'cpp', 'csharp']);
 const challengeIds = [1, 2, 3];
