@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MonacoEditor } from './MonacoEditor';
-import { QUESTION_BANK, LANGUAGES, starterFor, efficiencyScore, runCasesWithPiston } from '../dualChallenges';
+import { QUESTION_BANK, LANGUAGES, starterFor, efficiencyScore, runCasesLocally } from '../dualChallenges';
 
 function makePlayerId() {
   const stored = window.sessionStorage.getItem('warlock-player-id');
@@ -116,8 +116,8 @@ export function DualRoom() {
     if (!currentQuestion || !room || checking || room.submissions?.[playerId]) return;
     if (userCode.trim() === starterFor(currentQuestion, language).trim()) { setFeedback('Write a solution before submitting.'); return; }
     sendMessage({ type: 'code:update', code: userCode, language });
-    setChecking(true); setFeedback('Compiling and running test cases…');
-    const output = await runCasesWithPiston(currentQuestion, userCode, language);
+    setChecking(true); setFeedback('Running test cases…');
+    const output = await runCasesLocally(currentQuestion, userCode, language);
     setChecking(false);
     if (output.error) {
       setFeedback(`Could not score this submission: ${output.error}`);

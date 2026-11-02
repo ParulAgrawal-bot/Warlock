@@ -41,10 +41,6 @@ export const QUESTION_BANK = [
 
 export const LANGUAGES = [
   { id: 'javascript', label: 'JavaScript' },
-  { id: 'python', label: 'Python' },
-  { id: 'java', label: 'Java' },
-  { id: 'cpp', label: 'C++' },
-  { id: 'csharp', label: 'C#' },
 ];
 
 export function starterFor(question, language) {
@@ -75,82 +71,30 @@ export function efficiencyScore(question, code, language) {
       cpp: /\b(unordered_map|map)\s*</,
       csharp: /\bDictionary\s*</,
     };
-    return mapPatterns[language].test(code) ? 100 : 80;
+    return (mapPatterns[language] || mapPatterns.javascript).test(code) ? 100 : 80;
   }
   if (question.id === 3) return /%\s*10|Math\.floor|Integer\.toString|ToString\(|str\(/.test(code) ? 100 : 80;
   return /for\s*\([^;]+;[^;]*\*|\bwhile\s*\(/.test(code) ? 80 : 100;
 }
 
-function languageRuntime(language) {
-  return ({ javascript: 'javascript', python: 'python', java: 'java', cpp: 'c++', csharp: 'c#' })[language];
+export function runCasesLocally(question, code, language) {
+  if (language !== 'javascript') return Promise.resolve({ error: 'Only JavaScript evaluation is available.' });
+  return new Promise((resolve) => {
+    const worker = new Worker(new URL('./codeRunner.worker.js', import.meta.url), { type: 'module' });
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      resolve({ error: 'Execution timed out. Check for an infinite loop and try again.' });
+    }, 2000);
+    worker.onmessage = ({ data }) => {
+      clearTimeout(timeout);
+      worker.terminate();
+      resolve(data);
+    };
+    worker.onerror = (event) => {
+      clearTimeout(timeout);
+      worker.terminate();
+      resolve({ error: event.message || 'Could not run this JavaScript solution.' });
+    };
+    worker.postMessage({ functionName: question.functionName, cases: question.cases, code });
+  });
 }
-
-function pythonLiteral(value) {
-  return JSON.stringify(value).replace(/\btrue\b/g, 'True').replace(/\bfalse\b/g, 'False').replace(/\bnull\b/g, 'None');
-}
-
-function createProgram(question, code, language) {
-  if (language === 'javascript') {
-    return `${code}\nconst __solve = ${question.functionName};\nconst __cases = ${JSON.stringify(question.cases)};\nlet __passed = 0;\nfor (const {args, expected} of __cases) { const actual = __solve(...args) ?? args[0]; if (JSON.stringify(actual) === JSON.stringify(expected)) __passed++; }\nconsole.log('__WARLOCK_RESULT__' + __passed);`;
-  }
-  if (language === 'python') {
-    const tests = question.cases.map(({ args, expected }) => `    args = ${pythonLiteral(args)}\n    actual = solution.${question.functionName}(*args)\n    actual = args[0] if actual is None else actual\n    passed += int(actual == ${pythonLiteral(expected)})`).join('\n');
-    return `import json\n${code}\nsolution = Solution()\npassed = 0\n${tests}\nprint('__WARLOCK_RESULT__' + str(passed))`;
-  }
-  if (language === 'java') {
-    const tests = question.cases.map(({ args, expected }) => {
-      if (question.id === 1) return `        passed += Arrays.equals(solution.twoSum(new int[]{${args[0].join(',')}}, ${args[1]}), new int[]{${expected.join(',')}}) ? 1 : 0;`;
-      if (question.id === 2) return `        { char[] input = "${args[0].join('')}".toCharArray(); solution.reverseString(input); passed += Arrays.equals(input, "${expected.join('')}".toCharArray()) ? 1 : 0; }`;
-      return `        passed += solution.isPalindrome(${args[0]}) == ${expected} ? 1 : 0;`;
-    }).join('\n');
-    return `import java.util.*;\n${code}\npublic class Main { public static void main(String[] args) { Solution solution = new Solution(); int passed = 0;\n${tests}\nSystem.out.println("__WARLOCK_RESULT__" + passed); } }`;
-  }
-  if (language === 'cpp') {
-    const tests = question.cases.map(({ args, expected }) => {
-      if (question.id === 1) return `  { vector<int> input{${args[0].join(',')}}; passed += solution.twoSum(input, ${args[1]}) == vector<int>{${expected.join(',')}}; }`;
-      if (question.id === 2) return `  { vector<char> input{${args[0].map((char) => `'${char}'`).join(',')}}; solution.reverseString(input); passed += input == vector<char>{${expected.map((char) => `'${char}'`).join(',')}}; }`;
-      return `  passed += solution.isPalindrome(${args[0]}) == ${expected};`;
-    }).join('\n');
-    return `#include <bits/stdc++.h>\nusing namespace std;\n${code}\nint main() { Solution solution; int passed = 0;\n${tests}\ncout << "__WARLOCK_RESULT__" << passed << endl; }`;
-  }
-  const tests = question.cases.map(({ args, expected }) => {
-    if (question.id === 1) return `        passed += solution.TwoSum(new int[] { ${args[0].join(',')} }, ${args[1]}).SequenceEqual(new int[] { ${expected.join(',')} }) ? 1 : 0;`;
-    if (question.id === 2) return `        char[] input = "${args[0].join('')}".ToCharArray(); solution.ReverseString(input); passed += input.SequenceEqual("${expected.join('')}".ToCharArray()) ? 1 : 0;`;
-    return `        passed += solution.IsPalindrome(${args[0]}) == ${expected.toString().toLowerCase()} ? 1 : 0;`;
-  }).join('\n');
-  return `using System;\nusing System.Linq;\n${code}\nclass Program { static void Main() { var solution = new Solution(); int passed = 0;\n${tests}\nConsole.WriteLine("__WARLOCK_RESULT__" + passed); } }`;
-}
-
-export async function runCasesWithPiston(question, code, language) {
-  const configuredEndpoint = import.meta.env.VITE_PISTON_URL?.trim();
-  if (import.meta.env.PROD && (!configuredEndpoint || configuredEndpoint.startsWith('/piston-api/'))) {
-    return { error: 'The deployed site has no hosted code runner configured. Set VITE_PISTON_URL to a publicly reachable Piston /api/v2/execute endpoint, then redeploy.' };
-  }
-  const endpoint = (configuredEndpoint || '/piston-api/execute').replace(/\/$/, '');
-  let response;
-  try {
-    response = await fetch(endpoint, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        language: languageRuntime(language), version: '*',
-        files: [{ name: language === 'java' ? 'Main.java' : language === 'python' ? 'main.py' : language === 'cpp' ? 'main.cpp' : language === 'csharp' ? 'main.cs' : 'main.js', content: createProgram(question, code, language) }],
-        run_timeout: 5000, compile_timeout: 10000,
-      }),
-    });
-  } catch (error) {
-    const localRunnerMissing = /localhost:2000|127\.0\.0\.1:2000|^\/piston-api\//.test(endpoint);
-    return { error: localRunnerMissing
-      ? `No code runner is listening at ${endpoint}. Start Piston with Docker, install its language runtimes, then retry. (${error.message})`
-      : `Cannot reach the code runner at ${endpoint}. Check that Piston is running and allows requests from this app. (${error.message})` };
-  }
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) return { error: payload.message || `Code runner returned HTTP ${response.status}.` };
-  const compileError = payload.compile && (payload.compile.stderr || payload.compile.output) && payload.compile.code !== 0;
-  if (compileError) return { error: payload.compile.stderr || payload.compile.output || 'Compilation failed.' };
-  const run = payload.run || {};
-  if (run.code !== 0 || run.signal) return { error: run.stderr || run.output || 'The solution failed while running.' };
-  const match = (run.stdout || '').match(/__WARLOCK_RESULT__(\d+)/);
-  if (!match) return { error: run.stderr || 'The runner did not return a test result. Check the solution signature.' };
-  return { passed: Number(match[1]), total: question.cases.length };
-}
-

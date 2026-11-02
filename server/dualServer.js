@@ -4,7 +4,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 const port = Number(process.env.PORT || process.env.DUAL_PORT || 3001);
 const rooms = new Map();
-const validLanguages = new Set(['javascript', 'python', 'java', 'cpp', 'csharp']);
+const validLanguages = new Set(['javascript']);
 const challengeIds = [1, 2, 3];
 
 function send(socket, message) {
