@@ -122,7 +122,11 @@ function createProgram(question, code, language) {
 }
 
 export async function runCasesWithPiston(question, code, language) {
-  const endpoint = (import.meta.env.VITE_PISTON_URL || '/piston-api/execute').replace(/\/$/, '');
+  const configuredEndpoint = import.meta.env.VITE_PISTON_URL?.trim();
+  if (import.meta.env.PROD && (!configuredEndpoint || configuredEndpoint.startsWith('/piston-api/'))) {
+    return { error: 'The deployed site has no hosted code runner configured. Set VITE_PISTON_URL to a publicly reachable Piston /api/v2/execute endpoint, then redeploy.' };
+  }
+  const endpoint = (configuredEndpoint || '/piston-api/execute').replace(/\/$/, '');
   let response;
   try {
     response = await fetch(endpoint, {
