@@ -63,25 +63,37 @@ export function DualRoom() {
         const nextRoom = message.room;
         const self = nextRoom.players.find((entry) => entry.id === playerIdRef.current);
         const opponent = nextRoom.players.find((entry) => entry.id !== playerIdRef.current);
+        const selfLanguage = LANGUAGES.some((item) => item.id === self?.language) ? self.language : 'javascript';
+        const opponentLanguage = LANGUAGES.some((item) => item.id === opponent?.language) ? opponent.language : 'javascript';
         setRoom(nextRoom); setIsJoining(false); setConnection('connected'); setFeedback('');
-        if (opponent) { setRemoteCode(opponent.code || ''); setRemoteLanguage(opponent.language || 'javascript'); }
-        if (self?.language) { setLanguage(self.language); languageRef.current = self.language; }
+        if (opponent) { setRemoteCode(opponent.code || ''); setRemoteLanguage(opponentLanguage); }
+        setLanguage(selfLanguage); languageRef.current = selfLanguage;
+        if (nextRoom.roundId && roundIdRef.current === nextRoom.roundId && self?.language && self.language !== selfLanguage) {
+          const activeQuestion = QUESTION_BANK.find((entry) => entry.id === nextRoom.questionId);
+          if (activeQuestion) {
+            const starter = starterFor(activeQuestion, selfLanguage);
+            setUserCode(starter);
+            sendMessage({ type: 'code:update', code: starter, language: selfLanguage });
+          }
+        }
         if (nextRoom.roundId && roundIdRef.current !== nextRoom.roundId) {
           roundIdRef.current = nextRoom.roundId;
           const question = QUESTION_BANK.find((entry) => entry.id === nextRoom.questionId);
           setCurrentQuestion(question || null);
-          const starter = question ? starterFor(question, self?.language || languageRef.current) : '';
-          const nextCode = self?.code || starter;
+          const starter = question ? starterFor(question, selfLanguage) : '';
+          const hadUnsupportedLanguage = Boolean(self?.language && self.language !== selfLanguage);
+          const nextCode = hadUnsupportedLanguage ? starter : self?.code || starter;
           setUserCode(nextCode);
           setRemoteCode(opponent?.code || '');
           setTimeLeft(nextRoom.startedAt ? Math.max(0, 120 - Math.floor((Date.now() - nextRoom.startedAt) / 1000)) : 120);
-          if (question && !self?.code) sendMessage({ type: 'code:update', code: nextCode, language: self?.language || languageRef.current });
+          if (question && (!self?.code || hadUnsupportedLanguage)) sendMessage({ type: 'code:update', code: nextCode, language: selfLanguage });
         }
         if (nextRoom.startedAt && !nextRoom.winnerId) {
           setTimeLeft(Math.max(0, 120 - Math.floor((Date.now() - nextRoom.startedAt) / 1000)));
         }
       } else if (message.type === 'opponent:code') {
-        setRemoteCode(message.code); setRemoteLanguage(message.language);
+        setRemoteCode(message.code);
+        setRemoteLanguage(LANGUAGES.some((item) => item.id === message.language) ? message.language : 'javascript');
       }
     };
     socket.onerror = () => {
@@ -113,15 +125,19 @@ export function DualRoom() {
   };
 
   const submitCode = async () => {
-    if (!currentQuestion || !room || checking || room.submissions?.[playerId]) return;
+    if (!currentQuestion || !room || checking || (room.submissions?.[playerId] && !room.submissions[playerId].error)) return;
     if (userCode.trim() === starterFor(currentQuestion, language).trim()) { setFeedback('Write a solution before submitting.'); return; }
     sendMessage({ type: 'code:update', code: userCode, language });
     setChecking(true); setFeedback('Running test cases…');
-    const output = await runCasesLocally(currentQuestion, userCode, language);
+    let output;
+    try {
+      output = await runCasesLocally(currentQuestion, userCode, language);
+    } catch (error) {
+      output = { error: error.message || 'Could not evaluate this submission.' };
+    }
     setChecking(false);
     if (output.error) {
       setFeedback(`Could not score this submission: ${output.error}`);
-      sendMessage({ type: 'round:submit', roundId: room.roundId, passed: 0, total: currentQuestion.cases.length, score: 0, language, error: output.error });
       return;
     }
     const efficiency = efficiencyScore(currentQuestion, userCode, language);
@@ -144,6 +160,7 @@ export function DualRoom() {
   const opponent = room?.players?.find((entry) => entry.id !== playerId);
   const self = room?.players?.find((entry) => entry.id === playerId);
   const mySubmission = room?.submissions?.[playerId];
+  const canEditSubmission = !mySubmission || Boolean(mySubmission.error);
   const opponentSubmission = opponent ? room?.submissions?.[opponent.id] : null;
   const winnerId = room?.winnerId;
   const inRound = Boolean(currentQuestion && room?.startedAt && !winnerId && timeLeft > 0);
@@ -210,14 +227,14 @@ export function DualRoom() {
               <div className="duals-editors-grid">
                 <section className="duals-editor">
                   <div className="editor-status">{self?.name || 'You'} · {LANGUAGES.find((item) => item.id === language).label}</div>
-                  <div className="editor-body"><MonacoEditor language={language} value={userCode} onChange={handleCodeChange} onRun={submitCode} readOnly={Boolean(mySubmission) || checking} /></div>
+                  <div className="editor-body"><MonacoEditor language={language} value={userCode} onChange={handleCodeChange} onRun={submitCode} readOnly={!canEditSubmission || checking} /></div>
                 </section>
                 <section className="duals-editor">
                   <div className="editor-status">{opponent?.name || 'Opponent'} · {LANGUAGES.find((item) => item.id === remoteLanguage).label} · live view</div>
                   <div className="editor-body"><MonacoEditor language={remoteLanguage} value={remoteCode} readOnly /></div>
                 </section>
               </div>
-              <button type="button" className="btn run-btn duals-submit-btn" onClick={submitCode} disabled={checking || Boolean(mySubmission)}>{checking ? 'Checking…' : mySubmission ? 'Submitted' : 'Submit Code'}</button>
+              <button type="button" className="btn run-btn duals-submit-btn" onClick={submitCode} disabled={checking || !canEditSubmission}>{checking ? 'Checking…' : mySubmission && !mySubmission.error ? 'Submitted' : 'Submit Code'}</button>
               {feedback && <div className="duals-feedback">{feedback}</div>}
               {(mySubmission || opponentSubmission) && <div className="duals-live-scores"><span>{scoreLine(self, mySubmission)}</span><span>{scoreLine(opponent, opponentSubmission)}</span></div>}
             </div>
