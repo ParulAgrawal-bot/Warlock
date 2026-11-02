@@ -43,44 +43,26 @@ export const LANGUAGES = [
   { id: 'javascript', label: 'JavaScript' },
 ];
 
-export function starterFor(question, language) {
-  const functionName = question.functionName;
-  if (language === 'python') return `class Solution:\n    def ${functionName}(self, ${question.id === 1 ? 'nums, target' : question.id === 2 ? 's' : 'x'}):\n        # Write your code here\n        pass`;
-  if (language === 'java') {
-    const args = question.id === 1 ? 'int[] nums, int target' : question.id === 2 ? 'char[] s' : 'int x';
-    const type = question.id === 2 ? 'void' : question.id === 3 ? 'boolean' : 'int[]';
-    return `class Solution {\n    public ${type} ${functionName}(${args}) {\n        // Write your code here\n    }\n}`;
-  }
-  if (language === 'cpp') {
-    const signature = question.id === 1 ? 'vector<int> twoSum(vector<int>& nums, int target)' : question.id === 2 ? 'void reverseString(vector<char>& s)' : 'bool isPalindrome(int x)';
-    return `class Solution {\npublic:\n    ${signature} {\n        // Write your code here\n    }\n};`;
-  }
-  if (language === 'csharp') {
-    const signature = question.id === 1 ? 'int[] TwoSum(int[] nums, int target)' : question.id === 2 ? 'void ReverseString(char[] s)' : 'bool IsPalindrome(int x)';
-    return `public class Solution {\n    public ${signature} {\n        // Write your code here\n    }\n}`;
-  }
+export function starterFor(question) {
   return question.starterCode;
 }
 
-export function efficiencyScore(question, code, language) {
-  if (question.id === 1) {
-    const mapPatterns = {
-      javascript: /\bnew\s+Map\b/,
-      python: /\{\s*[^{}]*\bfor\b|\bdict\s*\(/,
-      java: /\bHashMap\b|\bMap\s*</,
-      cpp: /\b(unordered_map|map)\s*</,
-      csharp: /\bDictionary\s*</,
-    };
-    return (mapPatterns[language] || mapPatterns.javascript).test(code) ? 100 : 80;
-  }
-  if (question.id === 3) return /%\s*10|Math\.floor|Integer\.toString|ToString\(|str\(/.test(code) ? 100 : 80;
+export function efficiencyScore(question, code) {
+  if (question.id === 1) return /\bnew\s+Map\b/.test(code) ? 100 : 80;
+  if (question.id === 3) return /%\s*10|Math\.floor/.test(code) ? 100 : 80;
   return /for\s*\([^;]+;[^;]*\*|\bwhile\s*\(/.test(code) ? 80 : 100;
 }
 
 export function runCasesLocally(question, code, language) {
   if (language !== 'javascript') return Promise.resolve({ error: 'Only JavaScript evaluation is available.' });
   return new Promise((resolve) => {
-    const worker = new Worker(new URL('./codeRunner.worker.js', import.meta.url), { type: 'module' });
+    let worker;
+    try {
+      worker = new Worker(new URL('./codeRunner.worker.js', import.meta.url), { type: 'module' });
+    } catch (error) {
+      resolve({ error: error.message || 'Could not start the code evaluator.' });
+      return;
+    }
     const timeout = setTimeout(() => {
       worker.terminate();
       resolve({ error: 'Execution timed out. Check for an infinite loop and try again.' });

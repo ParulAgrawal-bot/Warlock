@@ -103,7 +103,7 @@ story.append(Spacer(1, 15*mm))
 story.append(cover)
 story.append(Spacer(1, 11*mm))
 metrics = Table([[
-    P("<font size='19' color='#10233F'><b>5</b></font><br/><font size='7.5' color='#5D6B82'>languages</font>", "Metric"),
+    P("<font size='19' color='#10233F'><b>1</b></font><br/><font size='7.5' color='#5D6B82'>supported language</font>", "Metric"),
     P("<font size='19' color='#10233F'><b>2</b></font><br/><font size='7.5' color='#5D6B82'>players per room</font>", "Metric"),
     P("<font size='19' color='#10233F'><b>80 / 20</b></font><br/><font size='7.5' color='#5D6B82'>correctness / efficiency</font>", "Metric"),
 ]], colWidths=[W/3]*3)
@@ -118,26 +118,26 @@ metrics.setStyle(TableStyle([
 story.append(metrics)
 story.append(Spacer(1, 9*mm))
 story.append(P("The result", "H2x"))
-story.append(P("Warlock grew from a browser-based code editor into a multiplayer coding challenge experience: players can join a room, work in parallel, run their solutions against challenge cases, and compare results. We also laid out the local execution and cloud deployment pieces needed to operate it.", "Bodyx"))
+story.append(P("Warlock grew from a browser-based code editor into a multiplayer coding challenge experience: players can join a room, work in parallel, run JavaScript solutions against challenge cases, and compare results.", "Bodyx"))
 story.append(Spacer(1, 3*mm))
-story.append(card("A clear split of responsibilities", "<b>Vercel</b> serves the frontend. <b>Render</b> runs the room and WebSocket server. <b>Piston in Docker</b> executes code for local development. A deployed website still needs a publicly reachable, safely proxied Piston service for remote submissions.", W))
+story.append(card("A clear split of responsibilities", "<b>Vercel</b> serves the frontend. <b>Render</b> runs the room and WebSocket server. JavaScript challenge solutions run in a short-lived browser Web Worker.", W))
 story.append(Spacer(1, 7*mm))
-story.append(P("This summary separates implemented project work from the deployment steps that still depend on an accessible code runner.", "Smallx"))
+story.append(P("This summary covers the implemented project work and its current browser-based evaluation flow.", "Smallx"))
 story.append(PageBreak())
 
 # Page 2: feature work
 story.append(P("FEATURES  /  IMPLEMENTED WORK", "Kicker"))
 story.append(P("From editor to head-to-head coding", "H1x"))
-story.append(P("The main product work centered on making coding challenges usable in multiple languages and playable by two people at once.", "Bodyx"))
+story.append(P("The main product work centered on making JavaScript coding challenges playable by two people at once.", "Bodyx"))
 story.append(Spacer(1, 3*mm))
 
 items = [
-    ("01  Multi-language editor", "Added a language selector for JavaScript, Python, Java, C++, and C#. Editor templates and challenge harnesses are generated for each language."),
+    ("01  JavaScript editor", "Focused the challenge editor on JavaScript and added starter templates for the available problems."),
     ("02  Live dual-player rooms", "Built room creation and joining with short room codes, player names, shared challenge state, and live code updates between two players."),
     ("03  Submit and compare", "Added individual submissions, test-case results, score comparison, and winner selection. The submit control and dual-editor layout were adjusted so the action remains visible."),
-    ("04  Correctness plus efficiency", "The score weights test correctness at 80% and a language-specific efficiency heuristic at 20%. The heuristic provides guidance; it is not a formal complexity proof."),
-    ("05  Real compilation and runtime checks", "Connected the scoring flow to Piston so compiled languages can report compiler errors and all supported languages can execute the challenge harness when the required runtime is installed."),
-    ("06  Docker-based local runner", "Added a Docker Compose service, persistent runtime storage, an installer for the five language runtimes, and a Vite proxy for local browser requests."),
+    ("04  Correctness plus efficiency", "The score weights test correctness at 80% and a JavaScript efficiency heuristic at 20%. The heuristic provides guidance; it is not a formal complexity proof."),
+    ("05  Challenge evaluation", "Runs submitted JavaScript against the challenge cases in a short-lived Web Worker."),
+    ("06  Execution timeout", "Added a worker timeout so an infinite loop cannot keep the evaluation running indefinitely."),
 ]
 for i in range(0, len(items), 2):
     pair = [card(items[i][0], items[i][1], W/2-3*mm), card(items[i+1][0], items[i+1][1], W/2-3*mm)]
@@ -157,7 +157,7 @@ story.append(P("Product decisions and fixes", "H2x"))
 bullets = [
     "Kept the frontend and the long-running multiplayer WebSocket process as separate deployable services.",
     "Added a health endpoint and Render port handling so the dual server can run as a web service.",
-    "Added a production-side message for an unconfigured runner instead of silently sending submissions to a missing local proxy.",
+    "Runs evaluation in a separate worker so the editor remains responsive while test cases execute.",
 ]
 for b in bullets:
     story.append(P("<font color='#0F9D8A'><b>-</b></font>  " + b, "Bodyx"))
@@ -167,13 +167,13 @@ story.append(PageBreak())
 # Page 3: deployment and status
 story.append(P("DEPLOYMENT  /  WHAT'S NEXT", "Kicker"))
 story.append(P("How the pieces fit", "H1x"))
-story.append(P("We worked through Vercel build settings, Render service settings, public WebSocket URLs, and the difference between local Docker execution and cloud execution.", "Bodyx"))
+story.append(P("We worked through Vercel build settings, Render service settings, and public WebSocket URLs for multiplayer rooms.", "Bodyx"))
 story.append(Spacer(1, 4*mm))
 
 arch = Table([
     [P("PLAYERS' BROWSER", "CenterSmall"), P("LINK", "CenterSmall"), P("SERVICE", "CenterSmall")],
-    [P("Vercel frontend<br/><font color='#5D6B82'>Vite build output: dist</font>", "CenterSmall"), P("<font color='#0F9D8A' size='11'><b>&lt;-&gt;</b></font>", "CenterSmall"), P("Piston API<br/><font color='#5D6B82'>Docker, local during development</font>", "CenterSmall")],
-    [P("Room creation, editors,<br/>challenge and scoring UI", "CenterSmall"), P("<font color='#0F9D8A' size='9'><b>runner calls</b></font>", "CenterSmall"), P("Requires an accessible endpoint<br/>and a browser-safe proxy in production", "CenterSmall")],
+    [P("Vercel frontend<br/><font color='#5D6B82'>Vite build output: dist</font>", "CenterSmall"), P("<font color='#0F9D8A' size='11'><b>&lt;-&gt;</b></font>", "CenterSmall"), P("JavaScript worker<br/><font color='#5D6B82'>Runs in the browser</font>", "CenterSmall")],
+    [P("Room creation, editors,<br/>challenge and scoring UI", "CenterSmall"), P("<font color='#0F9D8A' size='9'><b>test cases</b></font>", "CenterSmall"), P("Executes challenge code<br/>with a two-second timeout", "CenterSmall")],
     [P("Render Web Service<br/><font color='#5D6B82'>Node WebSocket server</font>", "CenterSmall"), P("<font color='#0F9D8A' size='11'><b>&lt;-&gt;</b></font>", "CenterSmall"), P("Room state and live<br/>code synchronization", "CenterSmall")],
 ], colWidths=[W*0.42, W*0.16, W*0.42])
 arch.setStyle(TableStyle([
@@ -190,7 +190,7 @@ story.append(P("Deployment knowledge gained", "H2x"))
 steps = [
     ("Vercel", "Build the Vite frontend with `npm run build`; the output folder is `dist`. The live frontend needs `VITE_DUAL_SERVER_URL` set to the Render WebSocket URL ending in `/dual-ws`, then a redeploy."),
     ("Render", "Deploy the Node server as a Web Service from the repository root. The service starts with `npm run dual-server` and listens on Render's assigned `PORT`. The `/health` route provides a health check; the root URL can return 404 by design."),
-    ("Docker / Piston", "Run `npm run piston:setup` locally with Docker Desktop running, then `npm run dev`. This local runner is not automatically reachable from Vercel or another player's device."),
+    ("Browser evaluation", "Run `npm run dev`; JavaScript challenge evaluation runs in a short-lived Web Worker without a separate runner service."),
 ]
 for title, body in steps:
     t = Table([[P(title, "CardTitle"), P(body, "CardBody")]], colWidths=[26*mm, W-26*mm])
@@ -207,7 +207,7 @@ for title, body in steps:
 
 story.append(Spacer(1, 5*mm))
 story.append(P("Current status and remaining dependency", "H2x"))
-callout = Table([[P("<b>Completed in the project:</b> editor language selection, dual rooms and code synchronization, scoring flow, Render/Vercel configuration, and the local Docker/Piston setup. <b>Still needed for online code submissions:</b> a Piston runner hosted somewhere both players' browsers can reach, plus a safe proxy that handles browser access. The Docker service added to this repository binds to the local machine only. The user reported deploying the frontend to Vercel and the dual server to Render; their end-to-end online runner configuration was still being worked through.", "Callout")]], colWidths=[W])
+callout = Table([[P("<b>Completed in the project:</b> JavaScript challenge editing and evaluation, dual rooms, code synchronization, score comparison, and Render/Vercel configuration. The browser runs challenge code in a short-lived Web Worker; no external code runner is required.", "Callout")]], colWidths=[W])
 callout.setStyle(TableStyle([
     ("BACKGROUND", (0,0), (-1,-1), HexColor("#EAF7F5")),
     ("BOX", (0,0), (-1,-1), 0.7, HexColor("#A6DED5")),
@@ -219,7 +219,7 @@ callout.setStyle(TableStyle([
 ]))
 story.append(callout)
 story.append(Spacer(1, 4*mm))
-story.append(P("A practical milestone: Warlock now has a defined path from writing code, to checking it, to competing live with another player - with the remaining online runner requirement clearly identified.", "Smallx"))
+story.append(P("Warlock now supports writing JavaScript solutions, checking them against challenge cases, and competing live with another player.", "Smallx"))
 
 doc.build(story, onFirstPage=on_page, onLaterPages=on_page)
 print(OUT)
