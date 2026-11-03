@@ -713,6 +713,37 @@
   font-size: 0.82rem;
 }
 
+.duals-result-codes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.duals-result-codes h3 {
+  margin: 0 0 6px;
+  color: #c8d0e8;
+  font-size: 0.85rem;
+}
+
+.duals-result-codes pre {
+  max-height: 260px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  color: #e8ecf4;
+  background: #0c0d18;
+  border: 1px solid #2a3148;
+  border-radius: 8px;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  .duals-result-codes { grid-template-columns: 1fr; }
+}
+
 .duals-submit-btn {
   flex: 0 0 auto;
   align-self: flex-start;

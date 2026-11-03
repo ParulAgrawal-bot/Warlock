@@ -6,6 +6,7 @@ const port = Number(process.env.PORT || process.env.DUAL_PORT || 3001);
 const rooms = new Map();
 const validLanguages = new Set(['javascript']);
 const challengeIds = [1, 2, 3];
+const ROUND_DURATION_MS = 120_000;
 
 function send(socket, message) {
   if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
@@ -20,6 +21,9 @@ function publicRoom(room) {
     questionId: room.questionId,
     startedAt: room.startedAt,
     roundId: room.roundId,
+    remainingMs: room.startedAt && !room.winnerId
+      ? Math.max(0, ROUND_DURATION_MS - (Date.now() - room.startedAt))
+      : null,
     submissions: Object.fromEntries(room.submissions),
     winnerId: room.winnerId,
   };
@@ -46,10 +50,24 @@ function cleanRoom(room) {
 function roomFor(code) {
   let room = rooms.get(code);
   if (!room) {
-    room = { code, players: new Map(), questionId: null, startedAt: null, roundId: null, submissions: new Map(), winnerId: null, emptyTimer: null };
+    room = { code, players: new Map(), questionId: null, startedAt: null, roundId: null, submissions: new Map(), winnerId: null, emptyTimer: null, roundTimer: null };
     rooms.set(code, room);
   }
   return room;
+}
+
+function expireRound(room, roundId) {
+  if (room.roundId !== roundId || room.winnerId) return;
+  const remaining = ROUND_DURATION_MS - (Date.now() - room.startedAt);
+  if (remaining > 0) {
+    clearTimeout(room.roundTimer);
+    room.roundTimer = setTimeout(() => expireRound(room, roundId), remaining);
+    room.roundTimer.unref?.();
+    return;
+  }
+  room.roundTimer = null;
+  room.winnerId = 'expired';
+  syncRoom(room);
 }
 
 const server = createServer((request, response) => {
@@ -118,34 +136,43 @@ wss.on('connection', (socket) => {
       activeRoom.questionId = challengeIds[Math.floor(Math.random() * challengeIds.length)];
       activeRoom.startedAt = Date.now();
       activeRoom.roundId = randomUUID();
+      clearTimeout(activeRoom.roundTimer);
       activeRoom.submissions = new Map();
       activeRoom.winnerId = null;
       for (const entry of activeRoom.players.values()) entry.code = '';
+      const roundId = activeRoom.roundId;
+      activeRoom.roundTimer = setTimeout(() => expireRound(activeRoom, roundId), ROUND_DURATION_MS);
+      activeRoom.roundTimer.unref?.();
       syncRoom(activeRoom);
       return;
     }
 
     if (message.type === 'round:submit') {
       if (!activeRoom.roundId || activeRoom.winnerId || message.roundId !== activeRoom.roundId) return;
+      if (Date.now() - activeRoom.startedAt >= ROUND_DURATION_MS) {
+        expireRound(activeRoom, activeRoom.roundId);
+        return;
+      }
       const passed = Math.max(0, Math.min(100, Number(message.passed) || 0));
       const total = Math.max(0, Math.min(100, Number(message.total) || 0));
       const score = Math.max(0, Math.min(100, Number(message.score) || 0));
       activeRoom.submissions.set(player.id, {
         passed, total, score,
         language: validLanguages.has(message.language) ? message.language : player.language,
+        code: player.code,
         error: typeof message.error === 'string' ? message.error.slice(0, 300) : null,
       });
       if (activeRoom.submissions.size === 2) {
         const [first, second] = [...activeRoom.submissions.entries()];
         activeRoom.winnerId = first[1].score === second[1].score ? 'draw' : first[1].score > second[1].score ? first[0] : second[0];
+        clearTimeout(activeRoom.roundTimer);
+        activeRoom.roundTimer = null;
       }
       syncRoom(activeRoom);
+      return;
     }
 
-    if (message.type === 'round:expire' && message.roundId === activeRoom.roundId && !activeRoom.winnerId) {
-      activeRoom.winnerId = 'expired';
-      syncRoom(activeRoom);
-    }
+    if (message.type === 'round:expire' && message.roundId === activeRoom.roundId) expireRound(activeRoom, activeRoom.roundId);
   });
 
   socket.on('close', () => {

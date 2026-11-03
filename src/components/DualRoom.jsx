@@ -29,6 +29,7 @@ export function DualRoom() {
   const socketRef = useRef(null);
   const codeTimerRef = useRef(null);
   const roundIdRef = useRef(null);
+  const roundDeadlineRef = useRef(null);
   const playerIdRef = useRef(playerId);
   const languageRef = useRef(language);
   playerIdRef.current = playerId;
@@ -66,7 +67,11 @@ export function DualRoom() {
         const selfLanguage = LANGUAGES.some((item) => item.id === self?.language) ? self.language : 'javascript';
         const opponentLanguage = LANGUAGES.some((item) => item.id === opponent?.language) ? opponent.language : 'javascript';
         setRoom(nextRoom); setIsJoining(false); setConnection('connected'); setFeedback('');
-        if (opponent) { setRemoteCode(opponent.code || ''); setRemoteLanguage(opponentLanguage); }
+        if (opponent) {
+          const opponentSubmission = nextRoom.submissions?.[opponent.id];
+          setRemoteCode(opponentSubmission?.code ?? opponent.code ?? '');
+          setRemoteLanguage(opponentSubmission?.language || opponentLanguage);
+        }
         setLanguage(selfLanguage); languageRef.current = selfLanguage;
         if (nextRoom.roundId && roundIdRef.current === nextRoom.roundId && self?.language && self.language !== selfLanguage) {
           const activeQuestion = QUESTION_BANK.find((entry) => entry.id === nextRoom.questionId);
@@ -85,11 +90,15 @@ export function DualRoom() {
           const nextCode = hadUnsupportedLanguage ? starter : self?.code || starter;
           setUserCode(nextCode);
           setRemoteCode(opponent?.code || '');
-          setTimeLeft(nextRoom.startedAt ? Math.max(0, 120 - Math.floor((Date.now() - nextRoom.startedAt) / 1000)) : 120);
+          const remainingMs = nextRoom.remainingMs ?? 120_000;
+          roundDeadlineRef.current = performance.now() + remainingMs;
+          setTimeLeft(Math.ceil(remainingMs / 1000));
           if (question && (!self?.code || hadUnsupportedLanguage)) sendMessage({ type: 'code:update', code: nextCode, language: selfLanguage });
         }
         if (nextRoom.startedAt && !nextRoom.winnerId) {
-          setTimeLeft(Math.max(0, 120 - Math.floor((Date.now() - nextRoom.startedAt) / 1000)));
+          const remainingMs = nextRoom.remainingMs ?? 120_000;
+          roundDeadlineRef.current = performance.now() + remainingMs;
+          setTimeLeft(Math.ceil(remainingMs / 1000));
         }
       } else if (message.type === 'opponent:code') {
         setRemoteCode(message.code);
@@ -163,17 +172,18 @@ export function DualRoom() {
   const canEditSubmission = !mySubmission || Boolean(mySubmission.error);
   const opponentSubmission = opponent ? room?.submissions?.[opponent.id] : null;
   const winnerId = room?.winnerId;
-  const inRound = Boolean(currentQuestion && room?.startedAt && !winnerId && timeLeft > 0);
+  const inRound = Boolean(currentQuestion && room?.startedAt && !winnerId);
 
   useEffect(() => {
-    if (!inRound || !room?.startedAt) return undefined;
-    const timer = setTimeout(() => {
-      const remaining = Math.max(0, 120 - Math.floor((Date.now() - room.startedAt) / 1000));
-      setTimeLeft(remaining);
-      if (remaining === 0) sendMessage({ type: 'round:expire', roundId: room.roundId });
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [inRound, room?.startedAt, timeLeft]);
+    if (!room?.startedAt || room.winnerId) return undefined;
+    const updateTimer = () => {
+      const remaining = Math.max(0, roundDeadlineRef.current - performance.now());
+      setTimeLeft(Math.ceil(remaining / 1000));
+    };
+    updateTimer();
+    const timer = setInterval(updateTimer, 200);
+    return () => clearInterval(timer);
+  }, [room?.roundId, room?.startedAt, room?.winnerId]);
 
   const scoreLine = (entry, score) => `${entry?.name || 'Player'}: ${score ? `${score.score}/100 (${score.passed}/${score.total})${score.error ? ` · ${score.error}` : ''}` : 'waiting for submission'}`;
 
@@ -240,8 +250,13 @@ export function DualRoom() {
             </div>
           ) : (
             <div className="duals-idle">
+              {winnerId === 'expired' && <div className="duals-outcome">TIME EXPIRED</div>}
               {winnerId && winnerId !== 'expired' && <div className={`duals-outcome ${winnerId === 'draw' ? 'duals-outcome--draw' : 'duals-outcome--win'}`}>{winnerId === 'draw' ? 'DRAW' : winnerId === playerId ? 'YOU WIN' : `${opponent?.name || 'OPPONENT'} WINS`}</div>}
               {(mySubmission || opponentSubmission) && <div className="duals-live-scores"><span>{scoreLine(self, mySubmission)}</span><span>{scoreLine(opponent, opponentSubmission)}</span></div>}
+              {winnerId && currentQuestion && <div className="duals-result-codes">
+                <section><h3>{self?.name || 'Your'} submitted code</h3><pre><code>{mySubmission?.code || self?.code || '(No code submitted)'}</code></pre></section>
+                <section><h3>{opponent?.name || 'Opponent'} submitted code</h3><pre><code>{opponentSubmission?.code || opponent?.code || '(No code submitted)'}</code></pre></section>
+              </div>}
               <p className="duals-idle-copy">{opponent?.connected ? 'Both players are connected. Start a shared challenge when ready.' : 'Share the room code with your opponent. The challenge starts when they join.'}</p>
               <button type="button" className="btn run-btn duals-start-btn" disabled={!opponent?.connected || !self?.connected || isJoining} onClick={startRound}>{winnerId ? 'Play Another Round' : 'Start Challenge'}</button>
               {feedback && <div className="duals-feedback">{feedback}</div>}
