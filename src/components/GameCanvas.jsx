@@ -276,7 +276,7 @@ function drawCoords(ctx, W, H) {
 }
 
 
-export function GameCanvas({ userCodeFnRef }) {
+export function GameCanvas({ userCodeFnRef, resetKey, onReset }) {
   const canvasRef = useRef(null);
   const stateRef = useRef({
     clawX: 240,
@@ -511,6 +511,15 @@ export function GameCanvas({ userCodeFnRef }) {
     };
   }, [ready]);
 
+  useEffect(() => {
+    stateRef.current = {
+      clawX: 240, clawY: TOP_Y, mode: 'idle', heldId: null,
+      wantDrop: false, wantRelease: false, plushies: makePlushies(), score: 0
+    };
+    setScore(0);
+    setBanner(null);
+  }, [resetKey]);
+
   const reset = () => {
     stateRef.current = {
       clawX: 240,
@@ -542,8 +551,8 @@ export function GameCanvas({ userCodeFnRef }) {
         )}
       </div>
       <div className="game-controls">
-        <button type="button" className="btn" onClick={reset}>
-          Reset pit
+        <button type="button" className="btn" onClick={onReset || reset}>
+          Reset Game
         </button>
         <button
           type="button"

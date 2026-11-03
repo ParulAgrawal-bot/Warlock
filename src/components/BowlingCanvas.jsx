@@ -108,7 +108,7 @@ function makeBallApi(s) {
     },
     roll(power = 6) {
       if (s.mode !== 'aim') return;
-      const p = Math.max(2, Math.min(12, Number(power) || 6));
+      const p = Math.max(2, Math.min(10, Number(power) || 6));
       s.wantRoll = p;
     },
     resetLane() {
@@ -221,7 +221,7 @@ function drawCoords(ctx, W, H) {
   ctx.restore();
 }
 
-export function BowlingCanvas({ userCodeFnRef }) {
+export function BowlingCanvas({ userCodeFnRef, resetKey, onReset }) {
   const canvasRef = useRef(null);
   const stateRef = useRef({
     mode: 'aim', // aim | rolling | done
@@ -262,6 +262,17 @@ export function BowlingCanvas({ userCodeFnRef }) {
       alive = false;
     };
   }, []);
+
+  useEffect(() => {
+    stateRef.current = {
+      mode: 'aim',
+      ball: { x: W / 2, y: BALL_START_Y, vx: 0, vy: 0, spin: 0, aimAngle: 0, power: 0 },
+      pins: makePins(), wantRoll: 0, wantReset: false, score: 0, frameScore: 0
+    };
+    setScore(0);
+    setStanding(10);
+    setBanner(null);
+  }, [resetKey]);
 
   useEffect(() => {
     if (!ready) return;
@@ -370,12 +381,12 @@ export function BowlingCanvas({ userCodeFnRef }) {
           const dx = p.x - b.x;
           const dy = p.y - b.y;
           const dist = Math.hypot(dx, dy);
-          const hitR = BALL_R + 14;
+          const hitR = BALL_R + 8;
           if (dist < hitR) {
             p.up = false;
             const force = Math.hypot(b.vx, b.vy);
-            p.vx = (dx / (dist || 1)) * force * 0.8 + b.vx * 0.5;
-            p.vy = (dy / (dist || 1)) * force * 0.5 + b.vy * 0.3;
+            p.vx = (dx / (dist || 1)) * force * 0.55 + b.vx * 0.3;
+            p.vy = (dy / (dist || 1)) * force * 0.35 + b.vy * 0.2;
             p.spin = (Math.random() - 0.5) * 0.4;
             // ball deflects a little
             b.vx -= dx * 0.01;
@@ -522,8 +533,7 @@ export function BowlingCanvas({ userCodeFnRef }) {
   }, [ready]);
 
   const reset = () => {
-    stateRef.current.wantReset = true;
-    stateRef.current.score = 0;
+    stateRef.current.wantReset = false;
     setScore(0);
     setStanding(10);
     setBanner(null);
@@ -560,8 +570,8 @@ export function BowlingCanvas({ userCodeFnRef }) {
         )}
       </div>
       <div className="game-controls">
-        <button type="button" className="btn" onClick={reset}>
-          Reset lane
+        <button type="button" className="btn" onClick={onReset || reset}>
+          Reset Game
         </button>
         <button
           type="button"

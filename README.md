@@ -2,6 +2,57 @@
 
 Minimal Monaco-based editor. Change language from the toolbar and write your own code.
 
+## Run the single-player games
+
+From the project folder, install dependencies and start the development server:
+
+```bash
+npm install
+npm run dev
+```
+
+Open the local URL printed by Vite (usually `http://localhost:5173`). Choose **Single Player**, select Claw or Bowling, and press **Run** to execute the example in the editor. Edit the example and press **Run** again to try your code. **Stop** disables the running game script. **Reset Game** stops the script, restores the selected game's example, and resets its board and score. The editor also supports Ctrl+Enter to run.
+
+### Bowling example
+
+The **Manual** button loads and runs an example. Each frame, the game calls the code with a `ball` (or `claw`) API object and a persistent `state` object. Define a function that accepts those objects, then call the function at the bottom of the editor:
+
+```js
+function playBowling(ball, state) {
+  if (!state.thrown && ball.isIdle) {
+    ball.moveTo(230, 3);
+    ball.setAngle(-4);
+    ball.roll(8);
+    state.thrown = true;
+  }
+}
+playBowling(ball, state);
+```
+
+Bowling commands: `move`, `moveTo`, `setAngle`, `turn`, `roll`, `resetLane`. Sensors: `x`, `y`, `angle`, `isIdle`, `isRolling`, `pinsStanding`, and `pinsDown`.
+
+### Claw example
+
+```js
+function controlClaw(claw, state) {
+  if (!state.finished && claw.isIdle) {
+    if (claw.hasPlushie) {
+      if (claw.atChute) {
+        claw.release();
+        state.finished = true;
+      } else claw.moveToChute(4);
+    } else {
+      const target = claw.nearestPlushie;
+      if (target && Math.abs(claw.x - target.x) > 5) claw.moveTo(target.x, 4);
+      else if (target) claw.drop();
+    }
+  }
+}
+controlClaw(claw, state);
+```
+
+Claw commands: `move`, `moveTo`, `moveToChute`, `drop`, and `release`. Sensors: `x`, `isIdle`, `hasPlushie`, `atChute`, and `nearestPlushie`.
+
 ## Dual mode code checking
 
 Dual mode supports two-player rooms with live code sharing, synchronized challenges, and head-to-head scores. The second player can connect from another device using the room code, provided both devices can reach the WebSocket server.

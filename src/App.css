@@ -31,6 +31,112 @@
   gap: 8px;
 }
 
+.manual-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(3, 5, 12, 0.78);
+}
+
+.manual-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: min(85vh, 900px);
+  overflow: hidden;
+  color: #e8ecf4;
+  background: #12141f;
+  border: 1px solid #00ffcc66;
+  border-radius: 12px;
+  box-shadow: 0 24px 80px #000b;
+}
+
+.manual-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid #2a3148;
+}
+
+.manual-dialog-header h2,
+.manual-dialog-header p,
+.manual-dialog-content h3 {
+  margin: 0;
+}
+
+.manual-dialog-header h2 {
+  color: #00ffcc;
+  font-size: 1.2rem;
+}
+
+.manual-dialog-header p {
+  margin-top: 4px;
+  color: #8c9bb3;
+  font-size: 0.85rem;
+}
+
+.manual-dialog-content {
+  overflow: auto;
+  padding: 20px 24px 28px;
+  line-height: 1.55;
+}
+
+.manual-dialog-content h3 {
+  margin-top: 22px;
+  margin-bottom: 8px;
+  color: #00ffcc;
+  font-size: 1rem;
+}
+
+.manual-dialog-content p,
+.manual-dialog-content ul {
+  margin-top: 8px;
+  margin-bottom: 12px;
+}
+
+.manual-dialog-content code {
+  color: #ffe600;
+  font-family: 'Share Tech Mono', Consolas, monospace;
+}
+
+.manual-dialog-content pre {
+  overflow: auto;
+  padding: 14px 16px;
+  background: #0c0d18;
+  border: 1px solid #2a3148;
+  border-radius: 8px;
+}
+
+.manual-function-list {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.8fr) 2fr;
+  gap: 8px 16px;
+  margin: 12px 0;
+}
+
+.manual-function-list dt {
+  font-weight: 700;
+}
+
+.manual-function-list dd {
+  margin: 0;
+  color: #c8d0e8;
+}
+
+@media (max-width: 600px) {
+  .manual-backdrop { padding: 10px; }
+  .manual-dialog-header { padding: 14px; }
+  .manual-dialog-content { padding: 14px; }
+  .manual-function-list { grid-template-columns: 1fr; gap: 3px; }
+  .manual-function-list dd { margin-bottom: 10px; }
+}
+
 .game-switch {
   display: flex;
   gap: 4px;

@@ -1,68 +1,108 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { MonacoEditor } from './components/MonacoEditor';
 import { GameCanvas } from './components/GameCanvas';
-import {CodingGameArena} from './components/dual_player'
+import { DualRoom } from './components/DualRoom';
 import { BowlingCanvas } from './components/BowlingCanvas';
 import './App.css';
 
 
 const CLAW_MANUAL = `/*
-================================================
-  CLAW GAME — INSTRUCTION MANUAL
-================================================
-
-HOW TO PLAY
-  1. Read the commands below.
-  2. Click Run (or Ctrl+Enter) to start the example.
-  3. Edit the code and Run again anytime.
-  4. Grab plushies → LEFT chute → release to win.
-  5. Drops can HIT or MISS (closer aim = better odds).
-
-COMMANDS
-  claw.move(speed)         Move (negative = left)
-  claw.moveTo(x, speed)    Move toward x
-  claw.moveToChute(speed)  Move to prize chute
-  claw.drop()              Lower claw (may miss!)
-  claw.release()           Drop held plushie
-
-SENSORS
-  claw.x  claw.y  claw.isIdle  claw.hasPlushie
-  claw.atChute  claw.nearestPlushie
-================================================
+Claw commands: move, moveTo, moveToChute, drop, release.
+Sensors: x, isIdle, hasPlushie, atChute, nearestPlushie.
+Define a function, then call it each frame. state persists between frames.
 */
-
-`;
+function controlClaw(claw, state) {
+  if (!state.finished && claw.isIdle) {
+    if (claw.hasPlushie) {
+      if (claw.atChute) {
+        claw.release();
+        state.finished = true;
+      } else {
+        claw.moveToChute(4);
+      }
+    } else {
+      const target = claw.nearestPlushie;
+      if (target && Math.abs(claw.x - target.x) > 5) {
+        claw.moveTo(target.x, 4);
+      } else if (target) {
+        claw.drop();
+      }
+    }
+  }
+}
+controlClaw(claw, state);`;
 
 const BOWLING_MANUAL = `/*
-================================================
-  BOWLING GAME — INSTRUCTION MANUAL
-================================================
-
-HOW TO PLAY
-  1. Read the commands below.
-  2. Click Run (or Ctrl+Enter) to start the example.
-  3. The ball rolls and flips front/back faces.
-  4. Knock pins down — all 10 = STRIKE!
-
-COMMANDS
-  ball.move(speed)       Aim left/right (negative = left)
-  ball.moveTo(x, speed)  Aim toward an x position
-  ball.setAngle(deg)     Set throw angle (-35 … 35)
-  ball.turn(deg)         Nudge angle (negative = left)
-  ball.roll(power)       Roll! power 2–12
-  ball.resetLane()       Reset pins + ball (keeps score)
-
-SENSORS
-  ball.x  ball.y  ball.angle
-  ball.isIdle            Ready to aim / roll
-  ball.isRolling         Ball is moving
-  ball.pinsStanding      Pins still up
-  ball.pinsDown          Pins already down
-================================================
+Bowling commands: move, moveTo, setAngle, turn, roll, resetLane.
+Sensors: x, y, angle, isIdle, isRolling, pinsStanding, pinsDown.
+Define a function, then call it each frame. state persists between frames.
 */
-`;
+function playBowling(ball, state) {
+  if (!state.thrown && ball.isIdle) {
+    ball.setAngle(0);
+    ball.roll(9);
+    state.thrown = true;
+  }
+}
+playBowling(ball, state);`;
 
 const MANUALS = { claw: CLAW_MANUAL, bowling: BOWLING_MANUAL };
+
+function ManualDialog({ game, onClose }) {
+  const isBowling = game === 'bowling';
+  return (
+    <div className="manual-backdrop" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      <section className="manual-dialog" role="dialog" aria-modal="true" aria-labelledby="manual-title">
+        <header className="manual-dialog-header">
+          <div>
+            <h2 id="manual-title">{isBowling ? 'Bowling' : 'Claw Machine'} Manual</h2>
+            <p>Function reference for the code editor</p>
+          </div>
+          <button type="button" className="btn" onClick={onClose} aria-label="Close manual">Close</button>
+        </header>
+        <div className="manual-dialog-content">
+          <p>Your code runs once on every animation frame. The game provides an API object ({isBowling ? <code>ball</code> : <code>claw</code>}) and a <code>state</code> object. Put your logic in a function and call it at the bottom of the editor. Values saved on <code>state</code> persist between frames, which lets you perform one-time actions only once.</p>
+          <h3>How to structure your code</h3>
+          <pre><code>{isBowling
+            ? 'function playBowling(ball, state) {\n  if (!state.thrown && ball.isIdle) {\n    ball.setAngle(-4);\n    ball.roll(8);\n    state.thrown = true;\n  }\n}\nplayBowling(ball, state);'
+            : 'function controlClaw(claw, state) {\n  if (claw.isIdle && !state.finished) {\n    // choose an action using the sensors below\n  }\n}\ncontrolClaw(claw, state);'}</code></pre>
+          <p>Press <strong>Run</strong> to execute the editor contents. The <strong>Manual</strong> button only opens this reference; it does not replace your code.</p>
+          <h3>{isBowling ? 'Bowling functions' : 'Claw functions'}</h3>
+          {isBowling ? (
+            <dl className="manual-function-list">
+              <dt><code>ball.move(speed)</code></dt><dd>Move the ball horizontally while it is ready to aim. Negative speed moves left; positive speed moves right.</dd>
+              <dt><code>ball.moveTo(x, speed)</code></dt><dd>Move toward a lane x-coordinate. The ball stops at the target instead of stepping past it.</dd>
+              <dt><code>ball.setAngle(degrees)</code></dt><dd>Set the throw direction: negative angles go left, positive angles go right, and 0 goes straight. The supported range is −35° to 35°.</dd>
+              <dt><code>ball.turn(degrees)</code></dt><dd>Adjust the current angle by the given amount.</dd>
+              <dt><code>ball.roll(power)</code></dt><dd>Start a throw when the ball is ready. Power is limited to 2–10; aim and set the angle before calling it.</dd>
+              <dt><code>ball.resetLane()</code></dt><dd>Replace the pins and return the ball to the start after a roll. The score is kept.</dd>
+            </dl>
+          ) : (
+            <dl className="manual-function-list">
+              <dt><code>claw.move(speed)</code></dt><dd>Move the claw horizontally. Negative speed moves left; positive speed moves right.</dd>
+              <dt><code>claw.moveTo(x, speed)</code></dt><dd>Move toward a target x-coordinate, stopping when the claw reaches it.</dd>
+              <dt><code>claw.moveToChute(speed)</code></dt><dd>Move toward the prize chute on the left side of the machine.</dd>
+              <dt><code>claw.drop()</code></dt><dd>Lower the claw to try to grab the nearest plushie. A grab can miss, especially when the claw is off-center.</dd>
+              <dt><code>claw.release()</code></dt><dd>Release a held plushie. It scores only when the claw is over the chute.</dd>
+            </dl>
+          )}
+          <h3>Sensor values</h3>
+          <p>{isBowling
+            ? <><code>ball.x</code> and <code>ball.y</code> are the ball coordinates; <code>ball.angle</code> is its aim angle. <code>ball.isIdle</code> is true while ready to aim or after a throw; <code>ball.isRolling</code> is true during a throw. <code>ball.pinsStanding</code> and <code>ball.pinsDown</code> report pin counts.</>
+            : <><code>claw.x</code> and <code>claw.y</code> are the claw coordinates. <code>claw.isIdle</code> is true when the claw can take an action; <code>claw.hasPlushie</code> reports whether it is holding a prize; <code>claw.atChute</code> reports whether it is near the chute. <code>claw.nearestPlushie</code> returns the closest available prize's <code>{'{ x, y, kind }'}</code> or <code>null</code>.</>}</p>
+          <h3>Tips</h3>
+          <ul>
+            <li>Check <code>isIdle</code> before issuing an action; movement and drop/roll commands are ignored while an animation is in progress.</li>
+            <li>Use flags such as <code>state.thrown</code> or <code>state.finished</code> so your function does not repeat a completed action every frame.</li>
+            <li>Use <strong>Stop</strong> to stop the script and <strong>Reset Game</strong> to restore the game and its example code.</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  );
+}
 
 /* ─────────────────────────────────────────────────────── */
 /*  MODE SELECTION LOBBY                                   */
@@ -151,7 +191,10 @@ export function App() {
   const [code, setCode]     = useState(CLAW_MANUAL);
   const [copied, setCopied] = useState(false);
   const [runMsg, setRunMsg] = useState('Manual loaded — click Run to try the example');
+  const [resetKey, setResetKey] = useState(0);
+  const [manualOpen, setManualOpen] = useState(false);
   const userCodeFnRef = useRef(null);
+  const userCodeStateRef = useRef({});
   const codeRef       = useRef(CLAW_MANUAL);
   const gameRef       = useRef('claw');
   codeRef.current = code;
@@ -172,11 +215,21 @@ export function App() {
   const compileAndRun = (source, whichGame) => {
     try {
       const arg = whichGame === 'claw' ? 'claw' : 'ball';
-      userCodeFnRef.current = new Function(arg, source);
+      const compiled = new Function(arg, 'state', source);
+      userCodeStateRef.current = {};
+      userCodeFnRef.current = (gameApi) => {
+        try {
+          compiled(gameApi, userCodeStateRef.current);
+        } catch (err) {
+          userCodeFnRef.current = null;
+          setRunMsg(`Runtime error: ${err.message}`);
+        }
+      };
       setRunMsg(whichGame === 'claw' ? 'Script running — claw follows your code' : 'Script running — ball follows your code');
       return true;
     } catch (err) {
       userCodeFnRef.current = null;
+      userCodeStateRef.current = {};
       setRunMsg('Syntax error: ' + err.message);
       return false;
     }
@@ -186,11 +239,24 @@ export function App() {
     setGame(next);
     setCode(MANUALS[next]);
     userCodeFnRef.current = null;
+    userCodeStateRef.current = {};
     setRunMsg(next === 'claw' ? 'Claw manual loaded — click Run to try the example' : 'Bowling manual loaded — click Run to try the example');
   };
 
   const handleRun    = () => compileAndRun(codeRef.current, gameRef.current);
-  const handleManual = () => { const m = MANUALS[game]; setCode(m); compileAndRun(m, game); setRunMsg('Manual example running — edit code anytime, then Run'); };
+  const handleStop = () => {
+    userCodeFnRef.current = null;
+    userCodeStateRef.current = {};
+    setRunMsg('Script stopped');
+  };
+  const handleReset = () => {
+    userCodeFnRef.current = null;
+    userCodeStateRef.current = {};
+    setCode(MANUALS[gameRef.current]);
+    setResetKey((key) => key + 1);
+    setRunMsg('Game reset — manual loaded; click Run to start');
+  };
+  const handleManual = () => setManualOpen(true);
   const handleCopy   = async () => {
     try { await navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ }
   };
@@ -212,7 +278,7 @@ export function App() {
           </div>
         </header>
         <main className="duals-section">
-          <CodingGameArena />
+          <DualRoom />
         </main>
       </div>
     );
@@ -234,6 +300,8 @@ export function App() {
           <span className="mode-badge">👤 Single Player</span>
           <GameSwitcher />
           <button type="button" className="btn run-btn" onClick={handleRun}>▶ Run</button>
+          <button type="button" className="btn" onClick={handleStop}>■ Stop</button>
+          <button type="button" className="btn" onClick={handleReset}>↻ Reset Game</button>
           <button type="button" className="btn" onClick={handleCopy}>{copied ? 'Copied' : 'Copy'}</button>
           <button type="button" className="btn" onClick={handleManual}>Manual</button>
           <button type="button" className="btn lobby-back-btn" onClick={() => setMode(null)}>← Lobby</button>
@@ -247,9 +315,10 @@ export function App() {
           </div>
         </section>
         <section className="game-side">
-          {game === 'claw' ? <GameCanvas userCodeFnRef={userCodeFnRef} /> : <BowlingCanvas userCodeFnRef={userCodeFnRef} />}
+          {game === 'claw' ? <GameCanvas userCodeFnRef={userCodeFnRef} resetKey={resetKey} onReset={handleReset} /> : <BowlingCanvas userCodeFnRef={userCodeFnRef} resetKey={resetKey} onReset={handleReset} />}
         </section>
       </main>
+      {manualOpen && <ManualDialog game={game} onClose={() => setManualOpen(false)} />}
     </div>
   );
 }
